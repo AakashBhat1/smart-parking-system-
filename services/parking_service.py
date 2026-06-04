@@ -1,0 +1,196 @@
+"""
+Smart Parking System — Parking Space Management Service
+CRUD operations for spaces, assignment, release, and statistics.
+"""
+import datetime
+from models import database as db
+
+
+def get_all_spaces():
+    """Get all parking spaces grouped by zone."""
+    rows = db.fetchall(
+        "SELECT space_id, zone, is_occupied, plate_text, entry_time FROM parking_spaces ORDER BY zone, space_id"
+    )
+    return [dict(r) for r in rows]
+
+
+def get_spaces_by_zone():
+    """Get spaces organized by zone."""
+    spaces = get_all_spaces()
+    zones = {}
+    for s in spaces:
+        zone = s["zone"]
+        if zone not in zones:
+            zones[zone] = []
+        zones[zone].append(s)
+    return zones
+
+
+def get_stats():
+    """Get overall parking statistics."""
+    total = db.fetchone("SELECT COUNT(*) as c FROM parking_spaces")["c"]
+    occupied = db.fetchone("SELECT COUNT(*) as c FROM parking_spaces WHERE is_occupied = 1")["c"]
+    free = total - occupied
+
+    today = datetime.date.today().isoformat()
+    plates_today = db.fetchone(
+        "SELECT COUNT(*) as c FROM detected_plates WHERE timestamp LIKE ?",
+        (f"{today}%",)
+    )["c"]
+
+    return {
+        "total": total,
+        "occupied": occupied,
+        "free": free,
+        "occupancy_pct": round(occupied / total * 100, 1) if total > 0 else 0,
+        "plates_today": plates_today,
+    }
+
+
+def get_free_spaces(limit=5):
+    """Get a list of free space IDs."""
+    rows = db.fetchall(
+        "SELECT space_id, zone FROM parking_spaces WHERE is_occupied = 0 ORDER BY zone, space_id LIMIT ?",
+        (limit,)
+    )
+    return [dict(r) for r in rows]
+
+
+def assign_space(plate_text):
+    """Assign the first available space to a plate. Returns space_id or None."""
+    row = db.fetchone("SELECT space_id FROM parking_spaces WHERE is_occupied = 0 ORDER BY zone, space_id LIMIT 1")
+    if not row:
+        return None
+
+    space_id = row["space_id"]
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    db.execute(
+        "UPDATE parking_spaces SET is_occupied = 1, plate_text = ?, entry_time = ? WHERE space_id = ?",
+        (plate_text, now, space_id), commit=True
+    )
+    db.execute(
+        "UPDATE detected_plates SET is_parked = 1 WHERE plate_text = ? AND is_parked = 0",
+        (plate_text,), commit=True
+    )
+
+    # Update session counters
+    session_id = db.get_current_session_id()
+    if session_id:
+        db.execute(
+            "UPDATE sessions SET spaces_used = spaces_used + 1 WHERE id = ?",
+            (session_id,), commit=True
+        )
+
+    db.log_activity("space_assigned", f"Plate {plate_text} assigned to {space_id}", plate_text, space_id)
+    return space_id
+
+
+def release_space(space_id):
+    """Release a parking space and calculate duration."""
+    row = db.fetchone(
+        "SELECT plate_text, entry_time FROM parking_spaces WHERE space_id = ? AND is_occupied = 1",
+        (space_id,)
+    )
+    if not row:
+        return None
+
+    plate_text = row["plate_text"]
+    entry_time = row["entry_time"]
+    now = datetime.datetime.now()
+    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    # Calculate duration
+    duration_min = 0
+    if entry_time:
+        try:
+            entry_dt = datetime.datetime.strptime(entry_time, "%Y-%m-%d %H:%M:%S")
+            duration_min = int((now - entry_dt).total_seconds() / 60)
+        except ValueError:
+            pass
+
+    # Clear the space
+    db.execute(
+        "UPDATE parking_spaces SET is_occupied = 0, plate_text = NULL, entry_time = NULL WHERE space_id = ?",
+        (space_id,), commit=True
+    )
+
+    # Update plate record
+    if plate_text:
+        db.execute(
+            "UPDATE detected_plates SET is_parked = 0, exit_time = ?, duration_minutes = ? WHERE plate_text = ? AND is_parked = 1",
+            (now_str, duration_min, plate_text), commit=True
+        )
+
+    db.log_activity(
+        "space_released",
+        f"Space {space_id} released (was {plate_text or 'unknown'}, {duration_min} min)",
+        plate_text, space_id
+    )
+    return {"space_id": space_id, "plate_text": plate_text, "duration_minutes": duration_min}
+
+
+def record_detection(plate_text, state, confidence):
+    """Record a newly detected plate."""
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db.execute(
+        "INSERT INTO detected_plates (plate_text, state, timestamp, confidence) VALUES (?, ?, ?, ?)",
+        (plate_text, state, now, confidence), commit=True
+    )
+
+    # Update session counter
+    session_id = db.get_current_session_id()
+    if session_id:
+        db.execute(
+            "UPDATE sessions SET plates_detected = plates_detected + 1 WHERE id = ?",
+            (session_id,), commit=True
+        )
+
+    db.log_activity("plate_detected", f"Detected plate: {plate_text} ({state})", plate_text)
+
+
+def get_recent_plates(limit=10):
+    """Get recently detected plates."""
+    rows = db.fetchall(
+        "SELECT id, plate_text, state, timestamp, is_parked, confidence FROM detected_plates ORDER BY id DESC LIMIT ?",
+        (limit,)
+    )
+    return [dict(r) for r in rows]
+
+
+def get_plate_by_id(plate_id):
+    """Get a single plate record."""
+    row = db.fetchone(
+        "SELECT id, plate_text, state, timestamp, is_parked, exit_time, duration_minutes, confidence FROM detected_plates WHERE id = ?",
+        (plate_id,)
+    )
+    return dict(row) if row else None
+
+
+def get_activity_log(limit=50):
+    """Get recent activity log entries."""
+    rows = db.fetchall(
+        "SELECT id, timestamp, event_type, description, plate_text, space_id FROM activity_log ORDER BY id DESC LIMIT ?",
+        (limit,)
+    )
+    return [dict(r) for r in rows]
+
+
+def get_session_info():
+    """Get current session information."""
+    row = db.fetchone("SELECT * FROM sessions ORDER BY id DESC LIMIT 1")
+    if not row:
+        return None
+    info = dict(row)
+
+    # Calculate uptime
+    try:
+        start = datetime.datetime.strptime(info["start_time"], "%Y-%m-%d %H:%M:%S")
+        uptime = datetime.datetime.now() - start
+        info["uptime_seconds"] = int(uptime.total_seconds())
+        info["uptime_display"] = str(uptime).split(".")[0]  # HH:MM:SS
+    except (ValueError, KeyError):
+        info["uptime_seconds"] = 0
+        info["uptime_display"] = "00:00:00"
+
+    return info

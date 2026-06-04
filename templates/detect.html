@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}License Plate Detection — Smart Parking{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1><i class="fas fa-camera"></i> License Plate Detection</h1>
+        <p class="page-subtitle">Live camera feed with automatic plate recognition</p>
+    </div>
+    <div class="header-actions">
+        <span class="live-badge"><span class="live-dot"></span> Live Feed</span>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card" id="camera-card">
+        <div class="card-header">
+            <h2><i class="fas fa-video"></i> Camera Feed</h2>
+        </div>
+        <div class="card-body">
+            <div class="video-container">
+                <img src="{{ url_for('feed.camera_feed') }}" alt="Live Camera Feed" class="video-feed" id="camera-feed">
+                <div class="video-overlay">
+                    <span class="video-badge"><i class="fas fa-circle rec-dot"></i> REC</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" id="detection-info-card">
+        <div class="card-header">
+            <h2><i class="fas fa-id-card"></i> Detection Info</h2>
+        </div>
+        <div class="card-body">
+            <div id="detection-status" class="detection-status">
+                <div class="detection-empty">
+                    <i class="fas fa-search"></i>
+                    <p>Waiting for detection...</p>
+                    <span>Point a license plate at the camera</span>
+                </div>
+            </div>
+
+            <div id="plate-display" class="plate-display" style="display:none">
+                <div class="plate-badge-lg" id="plate-text-display">--</div>
+                <div class="plate-meta">
+                    <div class="meta-row">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span id="plate-state-display">--</span>
+                    </div>
+                    <div class="meta-row">
+                        <i class="fas fa-clock"></i>
+                        <span id="plate-time-display">--</span>
+                    </div>
+                    <div class="meta-row">
+                        <i class="fas fa-parking"></i>
+                        <span id="plate-space-display">--</span>
+                    </div>
+                    <div class="meta-row">
+                        <i class="fas fa-percent"></i>
+                        <span id="plate-confidence-display">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-history"></i> Detection History</h2>
+    </div>
+    <div class="card-body">
+        <div class="plates-grid" id="detection-history">
+            <div class="activity-empty">
+                <i class="fas fa-camera"></i>
+                <p>No detections yet this session</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    let lastPlate = '';
+
+    function checkDetection() {
+        fetch('/api/latest_plate').then(r => r.json()).then(data => {
+            if (data.text && data.text !== lastPlate) {
+                lastPlate = data.text;
+                document.getElementById('detection-status').style.display = 'none';
+                const display = document.getElementById('plate-display');
+                display.style.display = 'block';
+                display.classList.add('animate-in');
+
+                document.getElementById('plate-text-display').textContent = data.text;
+                document.getElementById('plate-state-display').textContent = data.state || '--';
+                document.getElementById('plate-time-display').textContent = data.timestamp || '--';
+                document.getElementById('plate-space-display').textContent = data.space || 'Assigning...';
+                document.getElementById('plate-confidence-display').textContent = (data.confidence || 0) + '% confidence';
+
+                setTimeout(() => display.classList.remove('animate-in'), 500);
+            }
+        }).catch(() => {});
+    }
+
+    function loadHistory() {
+        fetch('/api/plates?limit=8').then(r => r.json()).then(plates => {
+            const grid = document.getElementById('detection-history');
+            if (!plates.length) return;
+            grid.innerHTML = plates.map(p => `
+                <div class="plate-chip">
+                    <span class="plate-num">${p.plate_text}</span>
+                    <span class="plate-state">${p.state}</span>
+                    <span class="plate-time">${p.timestamp}</span>
+                </div>
+            `).join('');
+        }).catch(() => {});
+    }
+
+    checkDetection();
+    loadHistory();
+    setInterval(checkDetection, 2000);
+    setInterval(loadHistory, 5000);
+});
+</script>
+{% endblock %}

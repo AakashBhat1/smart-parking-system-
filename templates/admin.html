@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — Smart Parking{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1><i class="fas fa-user-shield"></i> Admin Dashboard</h1>
+        <p class="page-subtitle">System analytics and session management</p>
+    </div>
+    <div class="header-actions">
+        <span class="session-timer"><i class="fas fa-clock"></i> Uptime: <span id="uptime-display">00:00:00</span></span>
+    </div>
+</div>
+
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-icon session"><i class="fas fa-power-off"></i></div>
+        <div class="stat-info">
+            <span class="stat-value" id="stat-session-plates">--</span>
+            <span class="stat-label">Session Detections</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon free"><i class="fas fa-square-parking"></i></div>
+        <div class="stat-info">
+            <span class="stat-value" id="admin-stat-free">--</span>
+            <span class="stat-label">Free Spaces</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon occupied"><i class="fas fa-car-side"></i></div>
+        <div class="stat-info">
+            <span class="stat-value" id="admin-stat-occupied">--</span>
+            <span class="stat-label">Occupied</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon rate"><i class="fas fa-gauge-high"></i></div>
+        <div class="stat-info">
+            <span class="stat-value" id="admin-stat-rate">--<small>%</small></span>
+            <span class="stat-label">Occupancy Rate</span>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-chart-bar"></i> Occupancy by Zone</h2>
+        </div>
+        <div class="card-body">
+            <div class="zone-bars" id="zone-bars">
+                <div class="activity-empty">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading zone data...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-info-circle"></i> Session Info</h2>
+        </div>
+        <div class="card-body">
+            <div class="session-details" id="session-details">
+                <div class="detail-row">
+                    <span class="detail-label"><i class="fas fa-play"></i> Started</span>
+                    <span class="detail-value" id="session-start">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label"><i class="fas fa-clock"></i> Uptime</span>
+                    <span class="detail-value" id="session-uptime">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label"><i class="fas fa-id-card"></i> Plates Detected</span>
+                    <span class="detail-value" id="session-plates">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label"><i class="fas fa-parking"></i> Spaces Used</span>
+                    <span class="detail-value" id="session-spaces">--</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-list-timeline"></i> Activity Log</h2>
+        <span class="card-badge" id="log-count">0 events</span>
+    </div>
+    <div class="card-body">
+        <div class="activity-table-wrap">
+            <table class="activity-table" id="activity-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Event</th>
+                        <th>Details</th>
+                        <th>Plate</th>
+                        <th>Space</th>
+                    </tr>
+                </thead>
+                <tbody id="activity-tbody">
+                    <tr><td colspan="5" class="center">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Parking Lot — Smart Parking{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1><i class="fas fa-car"></i> Parking Lot</h1>
+        <p class="page-subtitle">Interactive parking space overview</p>
+    </div>
+    <div class="header-actions">
+        <span class="live-badge"><span class="live-dot"></span> Live</span>
+    </div>
+</div>
+
+{% include "components/stats_cards.html" %}
+
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-grip"></i> Parking Grid</h2>
+        <div class="card-legend">
+            <span class="legend-item"><span class="legend-dot free"></span> Free</span>
+            <span class="legend-item"><span class="legend-dot occupied"></span> Occupied</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="parking-grid" id="parking-grid">
+            <div class="activity-empty">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading spaces...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-video"></i> Parking Camera</h2>
+    </div>
+    <div class="card-body">
+        <div class="video-container">
+            <img src="{{ url_for('feed.parking_feed') }}" alt="Parking Lot Feed" class="video-feed">
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/parking.js') }}"></script>
+{% endblock %}

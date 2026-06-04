@@ -1,0 +1,45 @@
+<nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="logo">
+            <i class="fas fa-parking"></i>
+            <span>ParkSmart</span>
+        </div>
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+
+    <ul class="nav-links">
+        <li>
+            <a href="{{ url_for('main.index') }}" class="nav-link {% if request.endpoint == 'main.index' %}active{% endif %}" id="nav-dashboard">
+                <i class="fas fa-chart-pie"></i>
+                <span>Dashboard</span>
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('main.detect') }}" class="nav-link {% if request.endpoint == 'main.detect' %}active{% endif %}" id="nav-detect">
+                <i class="fas fa-camera"></i>
+                <span>Detection</span>
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('main.parking') }}" class="nav-link {% if request.endpoint == 'main.parking' %}active{% endif %}" id="nav-parking">
+                <i class="fas fa-car"></i>
+                <span>Parking</span>
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('main.admin') }}" class="nav-link {% if request.endpoint == 'main.admin' %}active{% endif %}" id="nav-admin">
+                <i class="fas fa-user-shield"></i>
+                <span>Admin</span>
+            </a>
+        </li>
+    </ul>
+
+    <div class="sidebar-footer">
+        <div class="status-indicator">
+            <span class="status-dot online"></span>
+            <span>System Online</span>
+        </div>
+    </div>
+</nav>

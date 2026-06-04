@@ -1,0 +1,56 @@
+<!-- AI Chat Widget -->
+<div class="chat-widget" id="chat-widget">
+    <button class="chat-fab" id="chat-fab" aria-label="Open AI Assistant">
+        <i class="fas fa-robot"></i>
+        <span class="chat-fab-pulse"></span>
+    </button>
+
+    <div class="chat-panel" id="chat-panel">
+        <div class="chat-header">
+            <div class="chat-header-info">
+                <i class="fas fa-robot"></i>
+                <div>
+                    <h3>ParkBot AI</h3>
+                    <span class="chat-status">Online</span>
+                </div>
+            </div>
+            <div class="chat-header-actions">
+                <div class="chat-mode-toggle" id="chat-mode-toggle">
+                    <button class="mode-btn active" data-mode="user" id="mode-user">
+                        <i class="fas fa-user"></i> User
+                    </button>
+                    <button class="mode-btn" data-mode="admin" id="mode-admin">
+                        <i class="fas fa-user-shield"></i> Admin
+                    </button>
+                </div>
+                <button class="chat-close" id="chat-close" aria-label="Close chat">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+            <div class="chat-bubble bot">
+                <div class="chat-bubble-content">
+                    <p>Hi! I'm <strong>ParkBot</strong> 🚗 — your AI parking assistant.</p>
+                    <p>Ask me about free spaces, parking info, or switch to <strong>Admin</strong> mode for session reports!</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-typing" id="chat-typing" style="display:none">
+            <div class="typing-dots">
+                <span></span><span></span><span></span>
+            </div>
+            <span>ParkBot is thinking...</span>
+        </div>
+
+        <form class="chat-input-area" id="chat-form">
+            <input type="text" class="chat-input" id="chat-input"
+                   placeholder="Ask about parking spaces..." autocomplete="off">
+            <button type="submit" class="chat-send" id="chat-send" aria-label="Send message">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </form>
+    </div>
+</div>

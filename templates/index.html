@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Smart Parking System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1><i class="fas fa-chart-pie"></i> Dashboard</h1>
+        <p class="page-subtitle">Real-time parking system overview</p>
+    </div>
+    <div class="header-actions">
+        <span class="live-badge"><span class="live-dot"></span> Live</span>
+    </div>
+</div>
+
+{% include "components/stats_cards.html" %}
+
+<div class="grid-2">
+    <div class="card" id="occupancy-card">
+        <div class="card-header">
+            <h2><i class="fas fa-chart-pie"></i> Occupancy</h2>
+        </div>
+        <div class="card-body center">
+            <div class="donut-chart" id="donut-chart">
+                <svg viewBox="0 0 36 36" class="donut-svg">
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--surface-2)" stroke-width="2.5"/>
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--accent)" stroke-width="2.5"
+                            stroke-dasharray="0 100" stroke-dashoffset="25" stroke-linecap="round"
+                            class="donut-segment" id="donut-segment"/>
+                </svg>
+                <div class="donut-label">
+                    <span class="donut-pct" id="donut-pct">0%</span>
+                    <span class="donut-sub">Occupied</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" id="recent-activity-card">
+        <div class="card-header">
+            <h2><i class="fas fa-clock-rotate-left"></i> Recent Activity</h2>
+        </div>
+        <div class="card-body">
+            <div class="activity-feed" id="activity-feed">
+                <div class="activity-empty">
+                    <i class="fas fa-inbox"></i>
+                    <p>No recent activity</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" id="recent-plates-card">
+    <div class="card-header">
+        <h2><i class="fas fa-id-card"></i> Recent Detections</h2>
+    </div>
+    <div class="card-body">
+        <div class="plates-grid" id="plates-grid">
+            <div class="activity-empty">
+                <i class="fas fa-camera"></i>
+                <p>No plates detected yet</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    function updateDashboard() {
+        // Stats
+        fetch('/api/stats').then(r => r.json()).then(data => {
+            document.getElementById('stat-free').textContent = data.free;
+            document.getElementById('stat-occupied').textContent = data.occupied;
+            document.getElementById('stat-total').textContent = data.total;
+            document.getElementById('stat-rate').innerHTML = data.occupancy_pct + '<small>%</small>';
+
+            // Donut chart
+            const seg = document.getElementById('donut-segment');
+            if (seg) {
+                seg.setAttribute('stroke-dasharray', `${data.occupancy_pct} ${100 - data.occupancy_pct}`);
+            }
+            const pct = document.getElementById('donut-pct');
+            if (pct) pct.textContent = data.occupancy_pct + '%';
+        }).catch(() => {});
+
+        // Activity feed
+        fetch('/api/activity?limit=8').then(r => r.json()).then(events => {
+            const feed = document.getElementById('activity-feed');
+            if (!events.length) return;
+            const icons = {
+                'plate_detected': 'fa-id-card',
+                'space_assigned': 'fa-square-parking',
+                'space_released': 'fa-right-from-bracket',
+                'system': 'fa-gear'
+            };
+            feed.innerHTML = events.map(e => `
+                <div class="activity-item">
+                    <div class="activity-icon ${e.event_type}">
+                        <i class="fas ${icons[e.event_type] || 'fa-circle-info'}"></i>
+                    </div>
+                    <div class="activity-info">
+                        <p>${e.description}</p>
+                        <span class="activity-time">${e.timestamp}</span>
+                    </div>
+                </div>
+            `).join('');
+        }).catch(() => {});
+
+        // Recent plates
+        fetch('/api/plates?limit=6').then(r => r.json()).then(plates => {
+            const grid = document.getElementById('plates-grid');
+            if (!plates.length) return;
+            grid.innerHTML = plates.map(p => `
+                <div class="plate-chip">
+                    <span class="plate-num">${p.plate_text}</span>
+                    <span class="plate-state">${p.state}</span>
+                    <span class="plate-time">${p.timestamp}</span>
+                </div>
+            `).join('');
+        }).catch(() => {});
+    }
+
+    updateDashboard();
+    setInterval(updateDashboard, 4000);
+});
+</script>
+{% endblock %}
