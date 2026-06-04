@@ -1,6 +1,124 @@
 {% extends "base.html" %}
 {% block title %}Parking Lot — Smart Parking{% endblock %}
 
+{% block head %}
+<!-- Three.js and OrbitControls CDNs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+    .view-tabs {
+        display: flex;
+        gap: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        padding: 4px;
+        border-radius: 8px;
+        margin-left: auto;
+    }
+    .view-tab {
+        background: none;
+        border: none;
+        color: var(--text-3);
+        padding: 6px 12px;
+        font-family: inherit;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .view-tab.active {
+        background: var(--accent);
+        color: #000;
+    }
+    .parking-3d-wrapper {
+        position: relative;
+        width: 100%;
+        height: 500px;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background: #080808;
+    }
+    #threejs-container {
+        width: 100%;
+        height: 100%;
+    }
+    .three-hud-help {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        color: var(--text-2);
+        pointer-events: none;
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    /* 3D Tooltip Overlay */
+    .three-tooltip {
+        position: absolute;
+        background: rgba(18, 18, 18, 0.9);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        min-width: 180px;
+        pointer-events: auto;
+        opacity: 0;
+        transform: scale(0.9);
+        transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        z-index: 10;
+        display: none;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .three-tooltip.active {
+        opacity: 1;
+        transform: scale(1);
+        display: block;
+    }
+    .tooltip-header {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--accent);
+        margin-bottom: 6px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 4px;
+    }
+    .tooltip-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        margin-bottom: 4px;
+    }
+    .tooltip-label { color: var(--text-3); }
+    .tooltip-value { color: var(--text-1); font-weight: 500; }
+    .tooltip-action {
+        width: 100%;
+        margin-top: 8px;
+        background: #ff5252;
+        border: none;
+        border-radius: 4px;
+        color: #fff;
+        padding: 6px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
@@ -15,19 +133,32 @@
 {% include "components/stats_cards.html" %}
 
 <div class="card">
-    <div class="card-header">
-        <h2><i class="fas fa-grip"></i> Parking Grid</h2>
-        <div class="card-legend">
-            <span class="legend-item"><span class="legend-dot free"></span> Free</span>
-            <span class="legend-item"><span class="legend-dot occupied"></span> Occupied</span>
+    <div class="card-header" style="display: flex; align-items: center; justify-content: space-between;">
+        <h2><i class="fas fa-grip"></i> Parking Map</h2>
+        
+        <div class="view-tabs">
+            <button class="view-tab active" id="tab-2d"><i class="fas fa-table-cells"></i> 2D Grid</button>
+            <button class="view-tab" id="tab-3d"><i class="fas fa-cube"></i> 3D View</button>
         </div>
     </div>
     <div class="card-body">
+        <!-- 2D View Container -->
         <div class="parking-grid" id="parking-grid">
             <div class="activity-empty">
                 <i class="fas fa-spinner fa-spin"></i>
                 <p>Loading spaces...</p>
             </div>
+        </div>
+
+        <!-- 3D View Container -->
+        <div class="parking-3d-wrapper" id="parking-3d-wrapper" style="display: none;">
+            <div class="three-hud-help">
+                <i class="fas fa-mouse-pointer"></i>
+                <span>Drag to rotate | Scroll to zoom | Click slots</span>
+            </div>
+            <!-- Glassmorphic Tooltip inside WebGL area -->
+            <div class="three-tooltip" id="three-tooltip"></div>
+            <div id="threejs-container"></div>
         </div>
     </div>
 </div>
@@ -46,4 +177,35 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/parking.js') }}"></script>
+<script src="{{ url_for('static', filename='js/parking_3d.js') }}"></script>
+<script>
+    // Tab toggler logic
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn2d = document.getElementById('tab-2d');
+        const btn3d = document.getElementById('tab-3d');
+        const container2d = document.getElementById('parking-grid');
+        const container3d = document.getElementById('parking-3d-wrapper');
+
+        if (!btn2d || !btn3d) return;
+
+        btn2d.addEventListener('click', () => {
+            btn2d.classList.add('active');
+            btn3d.classList.remove('active');
+            container2d.style.display = 'grid';
+            container3d.style.display = 'none';
+        });
+
+        btn3d.addEventListener('click', () => {
+            btn3d.classList.add('active');
+            btn2d.classList.remove('active');
+            container2d.style.display = 'none';
+            container3d.style.display = 'block';
+            // Trigger Three.js resize / activation
+            window.dispatchEvent(new Event('resize'));
+            if (window.initParking3D) {
+                window.initParking3D();
+            }
+        });
+    });
+</script>
 {% endblock %}

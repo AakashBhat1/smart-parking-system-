@@ -63,6 +63,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateParkingGrid();
     setInterval(updateParkingGrid, 3000);
+
+    // Dynamic sandbox events to trigger immediate grid redraw
+    window.addEventListener('sandbox:entry', updateParkingGrid);
+    window.addEventListener('sandbox:exit', updateParkingGrid);
 });
 
 // Add zone header styles dynamically

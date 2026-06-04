@@ -85,6 +85,38 @@
     </div>
 </div>
 
+<div class="grid-2" style="margin-top: 24px;">
+    <!-- Card 1: Heatmap -->
+    <div class="card">
+        <div class="card-header" style="display: flex; align-items: center; justify-content: space-between;">
+            <h2><i class="fas fa-fire" style="color: #ff5252;"></i> Space Utilization Heatmap</h2>
+            <span style="font-size: 0.75rem; color: var(--text-3); font-weight: 500;">All-time usage intensity</span>
+        </div>
+        <div class="card-body" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 280px; background: rgba(0,0,0,0.1); border-radius: 8px; border: 1px solid rgba(255,255,255,0.01); padding: 16px;">
+            <div id="heatmap-svg-container" style="width: 100%; max-width: 500px; padding: 10px; display: flex; justify-content: center;">
+                <div class="activity-empty"><i class="fas fa-spinner fa-spin"></i><p>Generating heatmap...</p></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; width: 100%; max-width: 400px; margin-top: 14px; font-size: 0.7rem; color: var(--text-3); border-top: 1px solid var(--border); padding-top: 8px;">
+                <span style="display: flex; align-items: center; gap: 6px;"><span style="height: 8px; width: 8px; border-radius: 50%; background: #00b0ff; box-shadow: 0 0 6px rgba(0, 176, 255, 0.4);"></span> Cold (Low Usage)</span>
+                <span style="display: flex; align-items: center; gap: 6px;"><span style="height: 8px; width: 8px; border-radius: 50%; background: #ff5252; box-shadow: 0 0 6px rgba(255, 82, 82, 0.95);"></span> Hot (Frequent Usage)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Predictive Occupancy -->
+    <div class="card">
+        <div class="card-header" style="display: flex; align-items: center; justify-content: space-between;">
+            <h2><i class="fas fa-arrow-trend-up" style="color: var(--accent);"></i> 24h Occupancy Forecast</h2>
+            <span style="font-size: 0.75rem; color: var(--text-3); font-weight: 500;">Shaded: Forecast | Line: Today</span>
+        </div>
+        <div class="card-body" style="display: flex; align-items: center; justify-content: center; min-height: 280px; background: rgba(0,0,0,0.1); border-radius: 8px; border: 1px solid rgba(255,255,255,0.01); padding: 16px;">
+            <div id="forecast-svg-container" style="width: 100%; padding: 10px; display: flex; justify-content: center;">
+                <div class="activity-empty"><i class="fas fa-spinner fa-spin"></i><p>Analyzing forecast data...</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header">
         <h2><i class="fas fa-list-timeline"></i> Activity Log</h2>

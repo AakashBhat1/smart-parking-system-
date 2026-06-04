@@ -59,3 +59,48 @@ def session():
     if info:
         return jsonify(info)
     return jsonify({"error": "No active session"}), 404
+
+
+@api_bp.route("/analytics")
+def analytics():
+    return jsonify(parking_service.get_analytics_data())
+
+
+@api_bp.route("/sandbox/entry", methods=["POST"])
+def sandbox_entry():
+    data = request.get_json() or {}
+    plate_text = data.get("plate_text", "").strip().upper()
+    state = data.get("state", "DL").strip().upper()
+
+    if not plate_text:
+        return jsonify({"success": False, "error": "License plate text is required"}), 400
+
+    # Record detection
+    parking_service.record_detection(plate_text, state, 0.95)
+    
+    # Assign space
+    space_id = parking_service.assign_space(plate_text)
+    if space_id:
+        return jsonify({
+            "success": True,
+            "space_id": space_id,
+            "plate_text": plate_text,
+            "state": state
+        })
+    else:
+        return jsonify({"success": False, "error": "No parking spaces available"}), 400
+
+
+@api_bp.route("/sandbox/exit", methods=["POST"])
+def sandbox_exit():
+    data = request.get_json() or {}
+    space_id = data.get("space_id", "").strip()
+
+    if not space_id:
+        return jsonify({"success": False, "error": "Space ID is required"}), 400
+
+    result = parking_service.release_space(space_id)
+    if result:
+        return jsonify({"success": True, **result})
+    return jsonify({"success": False, "error": "Space not occupied or not found"}), 400
+

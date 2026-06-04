@@ -32,8 +32,73 @@
 
     {% include "components/chat_widget.html" %}
 
+    <!-- Sandbox Simulation Panel -->
+    <div class="sandbox-panel" id="sandbox-panel" style="position: fixed; bottom: 80px; left: 20px; width: 320px; background: rgba(18, 18, 18, 0.85); backdrop-filter: blur(16px); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); z-index: 1000; transform: translateY(120%) scale(0.9); opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); display: flex; flex-direction: column; overflow: hidden;">
+        <div class="sandbox-header" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border); background: rgba(0, 200, 100, 0.05);">
+            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 8px;"><i class="fas fa-gamepad"></i> Simulator Sandbox</h3>
+            <button class="sandbox-close" id="sandbox-close" style="background: none; border: none; color: var(--text-3); font-size: 1.2rem; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; height: 20px; width: 20px; transition: color 0.2s;" aria-label="Close sandbox">&times;</button>
+        </div>
+        <div class="sandbox-body" style="padding: 16px; display: flex; flex-direction: column; gap: 16px; max-height: 400px; overflow-y: auto;">
+            <div class="sandbox-section" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.03); padding: 12px; border-radius: 8px;">
+                <h4 style="margin: 0 0 10px 0; font-size: 0.82rem; font-weight: 600; color: var(--text-1); display: flex; align-items: center; gap: 6px;"><i class="fas fa-arrow-right-to-bracket" style="color: var(--accent);"></i> Simulate Entry</h4>
+                
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+                    <label for="sb-plate" style="font-size: 0.72rem; color: var(--text-3); font-weight: 500;">Plate Number</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="sb-plate" placeholder="e.g. MH12PQ9081" maxlength="10" style="flex: 1; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text-1); font-family: inherit; font-size: 0.8rem; text-transform: uppercase;">
+                        <button id="sb-gen-btn" style="background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; color: var(--text-2); font-family: inherit; font-size: 0.75rem; cursor: pointer; transition: all 0.2s;">Gen</button>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+                    <label for="sb-state" style="font-size: 0.72rem; color: var(--text-3); font-weight: 500;">Region</label>
+                    <select id="sb-state" style="background: rgba(18, 18, 18, 0.9); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text-1); font-family: inherit; font-size: 0.8rem; cursor: pointer;">
+                        <option value="MH">MH (Maharashtra)</option>
+                        <option value="DL">DL (Delhi)</option>
+                        <option value="KA">KA (Karnataka)</option>
+                        <option value="GJ">GJ (Gujarat)</option>
+                        <option value="HR">HR (Haryana)</option>
+                        <option value="UP">UP (Uttar Pradesh)</option>
+                    </select>
+                </div>
+                
+                <button id="sb-entry-btn" style="width: 100%; background: var(--accent); border: none; border-radius: 6px; padding: 8px; color: #000; font-family: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: opacity 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;">Park Vehicle</button>
+            </div>
+
+            <div class="sandbox-section" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.03); padding: 12px; border-radius: 8px;">
+                <h4 style="margin: 0 0 10px 0; font-size: 0.82rem; font-weight: 600; color: var(--text-1); display: flex; align-items: center; gap: 6px;"><i class="fas fa-arrow-right-from-bracket" style="color: #ff5252;"></i> Simulate Exit</h4>
+                
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+                    <label for="sb-occupied-spaces" style="font-size: 0.72rem; color: var(--text-3); font-weight: 500;">Occupied Spaces</label>
+                    <select id="sb-occupied-spaces" style="width: 100%; background: rgba(18, 18, 18, 0.9); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text-1); font-family: inherit; font-size: 0.8rem; cursor: pointer;">
+                        <option value="">No occupied spaces</option>
+                    </select>
+                </div>
+                
+                <button id="sb-exit-btn" style="width: 100%; background: #ff5252; border: none; border-radius: 6px; padding: 8px; color: #fff; font-family: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: opacity 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;">Unpark Vehicle</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .sandbox-panel.open {
+            transform: translateY(0) scale(1) !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+        .sandbox-toggle-btn:hover {
+            background: rgba(0, 200, 100, 0.15) !important;
+            border-color: var(--accent) !important;
+            box-shadow: 0 0 8px rgba(0, 200, 100, 0.2);
+        }
+        #sb-entry-btn:hover, #sb-exit-btn:hover {
+            opacity: 0.9;
+        }
+    </style>
+
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sandbox.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

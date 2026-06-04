@@ -194,3 +194,87 @@ def get_session_info():
         info["uptime_display"] = "00:00:00"
 
     return info
+
+
+def get_analytics_data():
+    """Get heatmap utilization and occupancy predictions."""
+    import math
+    
+    # 1. Heatmap: Count assignments per space
+    rows = db.fetchall(
+        "SELECT space_id, COUNT(*) as count FROM activity_log WHERE event_type = 'space_assigned' GROUP BY space_id"
+    )
+    heatmap = {r["space_id"]: r["count"] for r in rows}
+    
+    # Ensure all spaces are present in the heatmap dictionary
+    all_spaces = get_all_spaces()
+    for s in all_spaces:
+        if s["space_id"] not in heatmap:
+            heatmap[s["space_id"]] = 0
+            
+    # 2. Predictive occupancy: Hour by hour (0-23)
+    hourly_entries = [0] * 24
+    rows_hr = db.fetchall(
+        "SELECT strftime('%H', timestamp) as hr, COUNT(*) as count FROM detected_plates GROUP BY hr"
+    )
+    for r in rows_hr:
+        try:
+            hr = int(r["hr"])
+            hourly_entries[hr] = r["count"]
+        except (ValueError, TypeError):
+            pass
+
+    # Generate a smooth predictive baseline (sinusoidal business hours) scaled to lot size
+    total_spaces = len(all_spaces) if all_spaces else 24
+    predictions = []
+    for hr in range(24):
+        # Sine wave peaking at 14:00 (2 PM) and bottoming at 04:00 AM
+        val = 0.15 + 0.65 * (0.5 + 0.5 * math.sin(math.pi * (hr - 8) / 12))
+        # Add small weight from historical entries
+        hist_weight = min(hourly_entries[hr] * 0.1, 0.2)
+        val = min(max(val + hist_weight, 0.05), 0.95)
+        predictions.append(round(val * total_spaces, 1))
+
+    # 3. Actual occupancy of today so far (hour by hour)
+    today = datetime.date.today().isoformat()
+    actual_today = [None] * 24
+    current_hour = datetime.datetime.now().hour
+    
+    log_rows = db.fetchall(
+        "SELECT timestamp, event_type FROM activity_log WHERE timestamp LIKE ? ORDER BY timestamp ASC",
+        (f"{today}%",)
+    )
+    
+    # Find active slots before today to set baseline
+    pre_today = db.fetchone(
+        "SELECT COUNT(*) as c FROM detected_plates WHERE timestamp < ? AND is_parked = 1",
+        (f"{today} 00:00:00",)
+    )["c"]
+    curr_occ = pre_today
+    
+    hourly_events = {hr: [] for hr in range(24)}
+    for row in log_rows:
+        try:
+            dt = datetime.datetime.strptime(row["timestamp"], "%Y-%m-%d %H:%M:%S")
+            hourly_events[dt.hour].append(row["event_type"])
+        except ValueError:
+            pass
+            
+    for hr in range(24):
+        if hr > current_hour:
+            break
+        # Process events in this hour
+        for ev in hourly_events[hr]:
+            if ev == "space_assigned":
+                curr_occ = min(curr_occ + 1, total_spaces)
+            elif ev == "space_released":
+                curr_occ = max(curr_occ - 1, 0)
+        actual_today[hr] = curr_occ
+        
+    return {
+        "heatmap": heatmap,
+        "predictions": predictions,
+        "actual_today": actual_today,
+        "current_hour": current_hour
+    }
+
