@@ -100,6 +100,7 @@ function releaseSpace(spaceId) {
                     cell.classList.add('free');
                     cell.style.animation = 'slide-up 0.3s ease-out';
                 }
+                window.dispatchEvent(new CustomEvent('sandbox:exit', { detail: data }));
             }
         })
         .catch(() => alert('Failed to release space'));

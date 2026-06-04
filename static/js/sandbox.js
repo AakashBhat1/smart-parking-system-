@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 refreshOccupiedSpaces();
                 
                 // Dispatch custom event for real-time pages
-                window.dispatchEvent(new CustomEvent('sandbox:exit', { detail: { space_id: spaceId } }));
+                window.dispatchEvent(new CustomEvent('sandbox:exit', { detail: data }));
                 
                 showToast(`Vehicle released from space ${spaceId}`, 'success');
             } else {

@@ -117,6 +117,59 @@
     </div>
 </div>
 
+<div class="grid-2" style="margin-top: 24px;">
+    <!-- Financial Ledger Summary -->
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-wallet" style="color: #00ff66;"></i> Financial Ledger</h2>
+        </div>
+        <div class="card-body">
+            <div class="session-details">
+                <div class="detail-row">
+                    <span class="detail-label"><i class="fas fa-indian-rupee-sign"></i> Total Revenue</span>
+                    <span class="detail-value" id="inv-total-revenue" style="color: #00ff66; font-size: 1.25rem; font-weight: 800;">0.00 INR</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label"><i class="fas fa-receipt"></i> Total Transactions</span>
+                    <span class="detail-value" id="inv-total-transactions" style="font-weight: 700;">0</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label"><i class="fas fa-calculator"></i> Average Invoice</span>
+                    <span class="detail-value" id="inv-avg-transaction" style="font-weight: 700;">0.00 INR</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label"><i class="fas fa-tag"></i> Parking Rate</span>
+                    <span class="detail-value" style="color: var(--accent); font-weight: 700;">20.00 INR/hr</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-history"></i> Recent Transactions</h2>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <div class="activity-table-wrap" style="max-height: 200px; overflow-y: auto;">
+                <table class="activity-table" style="margin: 0;">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Plate</th>
+                            <th>Duration</th>
+                            <th>Paid</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recent-transactions-tbody">
+                        <tr><td colspan="4" class="center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header">
         <h2><i class="fas fa-list-timeline"></i> Activity Log</h2>

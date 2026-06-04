@@ -118,13 +118,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Group by Zone
                         const zones = {'A': [], 'B': [], 'C': []};
                         spaceIds.forEach(id => {
-                            const num = parseInt(id.replace('S-', ''));
-                            if (num <= 8) zones['A'].push(id);
-                            else if (num <= 16) zones['B'].push(id);
+                            const match = id.match(/-(\d+)$/);
+                            const num = match ? parseInt(match[1]) : 1;
+                            if (num <= 3) zones['A'].push(id);
+                            else if (num <= 6) zones['B'].push(id);
                             else zones['C'].push(id);
                         });
 
-                        let svgHtml = `<svg viewBox="0 0 500 200" width="100%" height="100%">`;
+                        let svgHtml = `<svg viewBox="0 0 560 200" width="100%" height="100%">`;
                         svgHtml += `
                             <defs>
                                 <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
@@ -284,12 +285,45 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(() => {});
     }
 
+    function updateBillingStats() {
+        fetch('/api/billing/stats')
+            .then(r => r.json())
+            .then(data => {
+                const totalRevEl = document.getElementById('inv-total-revenue');
+                const totalTransEl = document.getElementById('inv-total-transactions');
+                const avgTransEl = document.getElementById('inv-avg-transaction');
+                const tbody = document.getElementById('recent-transactions-tbody');
+
+                if (totalRevEl) totalRevEl.textContent = data.total_revenue.toFixed(2) + ' INR';
+                if (totalTransEl) totalTransEl.textContent = data.total_transactions;
+                if (avgTransEl) avgTransEl.textContent = data.avg_transaction.toFixed(2) + ' INR';
+
+                if (tbody) {
+                    if (!data.recent_transactions || !data.recent_transactions.length) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="center">No transactions recorded</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = data.recent_transactions.map(t => `
+                        <tr>
+                            <td>${t.exit_time}</td>
+                            <td style="color: var(--accent); font-weight: bold;">${t.plate_text}</td>
+                            <td>${t.duration_minutes} mins</td>
+                            <td style="color: #00ff66; font-weight: bold;">${t.amount_paid.toFixed(2)} INR</td>
+                        </tr>
+                    `).join('');
+                }
+            })
+            .catch(() => {});
+    }
+
     // Initial load
     updateSession();
     updateStats();
     updateZoneBars();
     updateActivity();
     updateAnalytics();
+    updateBillingStats();
 
     // Refresh intervals
     setInterval(updateUptime, 1000);
@@ -298,4 +332,5 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(updateZoneBars, 5000);
     setInterval(updateActivity, 4000);
     setInterval(updateAnalytics, 10000);
+    setInterval(updateBillingStats, 5000);
 });

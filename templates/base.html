@@ -10,9 +10,134 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block head %}{% endblock %}
+    <style>
+        /* LED Signboard Marquee Styles */
+        #led-hud-container {
+            background: #020202;
+            border-bottom: 2px solid #00ff66;
+            box-shadow: 0 4px 15px rgba(0, 255, 102, 0.15);
+        }
+        #led-signboard {
+            overflow: hidden;
+            position: relative;
+        }
+        @keyframes led-scroll {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+        .led-scrolling {
+            animation: led-scroll 30s linear infinite;
+            display: inline-block;
+        }
+
+        /* Glassmorphic Invoice Modal Styles */
+        #invoice-modal-wrapper {
+            transition: opacity 0.3s ease;
+        }
+        #invoice-modal {
+            box-shadow: 0 0 30px rgba(0, 210, 255, 0.4);
+            backdrop-filter: blur(25px) saturate(180%);
+            -webkit-backdrop-filter: blur(25px) saturate(180%);
+            background-color: rgba(10, 10, 15, 0.9);
+            border: 1px solid rgba(0, 210, 255, 0.3);
+        }
+
+        /* Blacklist Alert Border Animation */
+        @keyframes border-flash {
+            0%, 100% { 
+                border: 20px solid rgba(255, 0, 0, 0.85);
+                box-shadow: inset 0 0 60px rgba(255, 0, 0, 0.6);
+            }
+            50% { 
+                border: 20px solid rgba(255, 0, 0, 0.15);
+                box-shadow: inset 0 0 20px rgba(255, 0, 0, 0.1);
+            }
+        }
+        .blacklist-active {
+            animation: border-flash 0.6s infinite !important;
+        }
+    </style>
 </head>
 <body>
+    <!-- Blacklist Alert Overlay -->
+    <div id="blacklist-overlay" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; border: 0px solid red; box-sizing: border-box; pointer-events: none; z-index: 9999; transition: all 0.3s ease;"></div>
+
+    <!-- Glassmorphic Digital Invoice Modal -->
+    <div id="invoice-modal-wrapper" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;">
+        <div id="invoice-modal" style="background: rgba(18, 18, 24, 0.9); border: 2px solid #00d2ff; box-shadow: 0 0 25px rgba(0, 210, 255, 0.3); border-radius: 16px; padding: 24px; width: 380px; max-width: 90%; color: #fff; font-family: 'Inter', sans-serif; position: relative; transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);">
+            
+            <!-- Close Button -->
+            <button id="invoice-close" style="position: absolute; top: 15px; right: 15px; background: none; border: none; color: #ff5252; font-size: 1.2rem; cursor: pointer; transition: color 0.2s;">
+                <i class="fas fa-times"></i>
+            </button>
+
+            <!-- Receipt Header -->
+            <div style="text-align: center; border-bottom: 1px dashed rgba(255, 255, 255, 0.15); padding-bottom: 15px; margin-bottom: 20px;">
+                <div style="color: #00d2ff; font-weight: 800; font-size: 1.3rem; letter-spacing: 1px; margin-bottom: 4px;">SMART PARKING INVOICE</div>
+                <div style="font-size: 0.72rem; color: var(--text-3); text-transform: uppercase;">TRANSACTION RECEIPT</div>
+            </div>
+
+            <!-- Receipt Body -->
+            <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem; margin-bottom: 20px; font-family: monospace;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-3);">INVOICE NO:</span>
+                    <span id="inv-number" style="color: #fff; font-weight: 600;">INV-908124</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-3);">DATE:</span>
+                    <span id="inv-date" style="color: #fff;">2026-06-05 01:20:00</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; border-top: 1px dashed rgba(255, 255, 255, 0.08); padding-top: 10px;">
+                    <span style="color: var(--text-3);">PLATE NUMBER:</span>
+                    <span id="inv-plate" style="color: var(--accent); font-weight: bold; font-size: 0.95rem;">MH12AB1234</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-3);">DURATION:</span>
+                    <span id="inv-duration" style="color: #fff;">45 Minutes</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-3);">RATE:</span>
+                    <span style="color: #fff;">20.00 INR / Hr</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; border-top: 2px solid rgba(255, 255, 255, 0.15); padding-top: 12px; font-size: 1.1rem; font-weight: bold;">
+                    <span style="color: #fff;">TOTAL PAID:</span>
+                    <span id="inv-amount" style="color: #00ff66;">20.00 INR</span>
+                </div>
+            </div>
+
+            <!-- Barcode -->
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 24px; opacity: 0.7;">
+                <div style="font-family: 'Courier New', monospace; font-size: 1.4rem; letter-spacing: -1px; font-weight: bold; transform: scaleY(1.5);">
+                    ||||||||||||||||||||||||||||||||||||
+                </div>
+                <div style="font-size: 0.6rem; letter-spacing: 3px; color: var(--text-3);">*SMARTPARK*</div>
+            </div>
+
+            <!-- Action Button -->
+            <button id="invoice-ok-btn" style="width: 100%; background: #00d2ff; border: none; border-radius: 8px; padding: 10px; color: #000; font-family: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: opacity 0.2s;">
+                PRINT RECEIPT
+            </button>
+
+            <!-- Paid Stamp -->
+            <div id="invoice-stamp" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-20deg) scale(3); border: 4px solid #00ff66; color: #00ff66; font-size: 2.2rem; font-weight: 900; padding: 6px 18px; border-radius: 8px; opacity: 0; pointer-events: none; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-shadow: 0 0 10px rgba(0, 255, 102, 0.3); background: rgba(18, 18, 24, 0.95); box-shadow: 0 0 20px rgba(0,255,102,0.2);">
+                PAID
+            </div>
+        </div>
+    </div>
+
     {% include "components/nav.html" %}
+
+    <!-- LED Signboard HUD -->
+    <div id="led-hud-container" style="padding: 6px 0; overflow: hidden; position: relative; z-index: 99; display: flex; align-items: center;">
+        <div style="background: #000; color: #00ff66; padding: 2px 10px; font-family: 'Courier New', monospace; font-size: 0.8rem; font-weight: bold; border: 1px solid #00ff66; border-radius: 4px; margin-left: 20px; box-shadow: inset 0 0 5px rgba(0, 255, 102, 0.5); text-shadow: 0 0 3px #00ff66; flex-shrink: 0;">
+            SYSTEM STATUS
+        </div>
+        <div id="led-signboard" style="white-space: nowrap; overflow: hidden; display: flex; align-items: center; width: 100%; margin-left: 15px;">
+            <div id="led-text" class="led-scrolling" style="display: inline-block; font-family: 'Courier New', Courier, monospace; font-size: 0.95rem; font-weight: bold; color: #ff9900; text-shadow: 0 0 5px #ff9900, 0 0 10px #ff9900; letter-spacing: 2px;">
+                INITIALIZING SMART PARKING SYSTEMS...
+            </div>
+        </div>
+    </div>
 
     <main class="main-content">
         <div class="container">
@@ -99,6 +224,8 @@
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sandbox.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/led_hud.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/invoice.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

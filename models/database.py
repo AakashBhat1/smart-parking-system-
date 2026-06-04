@@ -66,6 +66,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             space_id TEXT UNIQUE NOT NULL,
             zone TEXT DEFAULT 'A',
+            floor TEXT DEFAULT 'G',
             is_occupied INTEGER DEFAULT 0,
             plate_text TEXT DEFAULT NULL,
             entry_time TEXT DEFAULT NULL
@@ -79,7 +80,15 @@ def init_db():
             is_parked INTEGER DEFAULT 0,
             exit_time TEXT DEFAULT NULL,
             duration_minutes INTEGER DEFAULT NULL,
-            confidence REAL DEFAULT 0
+            confidence REAL DEFAULT 0,
+            amount_paid REAL DEFAULT 0.0
+        );
+
+        CREATE TABLE IF NOT EXISTS vehicle_profiles (
+            plate_text TEXT PRIMARY KEY,
+            profile_type TEXT DEFAULT 'normal',
+            owner_name TEXT,
+            notes TEXT
         );
 
         CREATE TABLE IF NOT EXISTS sessions (
@@ -110,24 +119,45 @@ def init_db():
     """)
     conn.commit()
 
+    # Seed vehicle profiles if empty
+    prof_count = cursor.execute("SELECT COUNT(*) FROM vehicle_profiles").fetchone()[0]
+    if prof_count == 0:
+        cursor.executescript("""
+            INSERT INTO vehicle_profiles (plate_text, profile_type, owner_name, notes) VALUES
+            ('VIP-111', 'vip', 'CEO Office', 'CEO Personal Vehicle. VIP Parking access.'),
+            ('VIP-777', 'vip', 'Managing Director', 'Welcome Managing Director!'),
+            ('ALERT-99', 'blacklist', 'Stolen Vehicle DB', 'BOLO: Suspected stolen vehicle. Flag security!'),
+            ('MH12AB1234', 'normal', 'Aakash Bhat', 'Regular employee vehicle.');
+        """)
+        conn.commit()
+
     # Seed parking spaces if empty
     count = cursor.execute("SELECT COUNT(*) FROM parking_spaces").fetchone()[0]
     if count == 0:
-        zones = ['A', 'B', 'C']
-        spaces_per_zone = config.DEFAULT_SPACES // len(zones)
-        remainder = config.DEFAULT_SPACES % len(zones)
+        floors = ['G', '1', '2']
+        spaces_per_floor = [
+            # Floor, space_id list, zone mapping
+            ('G', [f'G-{i:02d}' for i in range(1, 9)]),
+            ('1', [f'F1-{i:02d}' for i in range(1, 9)]),
+            ('2', [f'F2-{i:02d}' for i in range(1, 9)])
+        ]
         
-        space_num = 1
-        for i, zone in enumerate(zones):
-            n = spaces_per_zone + (1 if i < remainder else 0)
-            for _ in range(n):
+        for floor, spaces in spaces_per_floor:
+            for idx, space_id in enumerate(spaces):
+                # Zone allocation: 1-3 is A, 4-6 is B, 7-8 is C
+                if idx < 3:
+                    zone = 'A'
+                elif idx < 6:
+                    zone = 'B'
+                else:
+                    zone = 'C'
+                
                 cursor.execute(
-                    "INSERT INTO parking_spaces (space_id, zone) VALUES (?, ?)",
-                    (f"S-{space_num:02d}", zone)
+                    "INSERT INTO parking_spaces (space_id, zone, floor) VALUES (?, ?, ?)",
+                    (space_id, zone, floor)
                 )
-                space_num += 1
         conn.commit()
-        log_activity("system", f"Initialized {config.DEFAULT_SPACES} parking spaces across {len(zones)} zones")
+        log_activity("system", "Initialized 24 parking spaces across 3 floors (G, 1, 2) and zones (A, B, C)")
 
     # Start a new session
     start_session()

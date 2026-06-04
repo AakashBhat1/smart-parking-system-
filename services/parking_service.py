@@ -9,7 +9,7 @@ from models import database as db
 def get_all_spaces():
     """Get all parking spaces grouped by zone."""
     rows = db.fetchall(
-        "SELECT space_id, zone, is_occupied, plate_text, entry_time FROM parking_spaces ORDER BY zone, space_id"
+        "SELECT space_id, zone, floor, is_occupied, plate_text, entry_time FROM parking_spaces ORDER BY zone, space_id"
     )
     return [dict(r) for r in rows]
 
@@ -57,8 +57,26 @@ def get_free_spaces(limit=5):
 
 
 def assign_space(plate_text):
-    """Assign the first available space to a plate. Returns space_id or None."""
-    row = db.fetchone("SELECT space_id FROM parking_spaces WHERE is_occupied = 0 ORDER BY zone, space_id LIMIT 1")
+    """Assign the first available space to a plate, routing VIPs to premium Ground Floor spots. Returns space_id or None."""
+    # Look up vehicle profile
+    profile = db.fetchone("SELECT profile_type FROM vehicle_profiles WHERE plate_text = ?", (plate_text,))
+    profile_type = profile["profile_type"] if profile else "normal"
+
+    if profile_type == "blacklist":
+        db.log_activity("security_alert", f"BOLO ALERT: Blacklisted vehicle {plate_text} detected! Notify security.", plate_text)
+
+    row = None
+    if profile_type == "vip":
+        # Route to nearest Ground floor space
+        row = db.fetchone("SELECT space_id FROM parking_spaces WHERE is_occupied = 0 AND floor = 'G' ORDER BY space_id ASC LIMIT 1")
+    
+    if not row:
+        # Fallback to standard search prioritizing G -> 1 -> 2 floors
+        row = db.fetchone(
+            "SELECT space_id FROM parking_spaces WHERE is_occupied = 0 "
+            "ORDER BY CASE floor WHEN 'G' THEN 1 WHEN '1' THEN 2 WHEN '2' THEN 3 END ASC, space_id ASC LIMIT 1"
+        )
+        
     if not row:
         return None
 
@@ -82,12 +100,16 @@ def assign_space(plate_text):
             (session_id,), commit=True
         )
 
-    db.log_activity("space_assigned", f"Plate {plate_text} assigned to {space_id}", plate_text, space_id)
+    if profile_type == "vip":
+        db.log_activity("vip_entry", f"VIP {plate_text} routed to premium spot {space_id}", plate_text, space_id)
+    else:
+        db.log_activity("space_assigned", f"Plate {plate_text} assigned to {space_id}", plate_text, space_id)
+        
     return space_id
 
 
 def release_space(space_id):
-    """Release a parking space and calculate duration."""
+    """Release a parking space, calculate stay duration and financial tariff."""
     row = db.fetchone(
         "SELECT plate_text, entry_time FROM parking_spaces WHERE space_id = ? AND is_occupied = 1",
         (space_id,)
@@ -109,6 +131,19 @@ def release_space(space_id):
         except ValueError:
             pass
 
+    # Calculate payment amount based on tariff
+    amount = 0.0
+    if duration_min >= 0:
+        import config
+        import math
+        rate = getattr(config, "PARKING_RATE_PER_HOUR", 20)
+        if duration_min > 5:
+            # Hourly billing, rounded up
+            amount = float(math.ceil(duration_min / 60.0) * rate)
+        else:
+            # Under 5 mins is flat test rate
+            amount = 10.0
+
     # Clear the space
     db.execute(
         "UPDATE parking_spaces SET is_occupied = 0, plate_text = NULL, entry_time = NULL WHERE space_id = ?",
@@ -118,16 +153,22 @@ def release_space(space_id):
     # Update plate record
     if plate_text:
         db.execute(
-            "UPDATE detected_plates SET is_parked = 0, exit_time = ?, duration_minutes = ? WHERE plate_text = ? AND is_parked = 1",
-            (now_str, duration_min, plate_text), commit=True
+            "UPDATE detected_plates SET is_parked = 0, exit_time = ?, duration_minutes = ?, amount_paid = ? WHERE plate_text = ? AND is_parked = 1",
+            (now_str, duration_min, amount, plate_text), commit=True
         )
 
     db.log_activity(
         "space_released",
-        f"Space {space_id} released (was {plate_text or 'unknown'}, {duration_min} min)",
+        f"Space {space_id} released (was {plate_text or 'unknown'}, {duration_min} min, paid: {amount} INR)",
         plate_text, space_id
     )
-    return {"space_id": space_id, "plate_text": plate_text, "duration_minutes": duration_min}
+    
+    return {
+        "space_id": space_id,
+        "plate_text": plate_text,
+        "duration_minutes": duration_min,
+        "amount_paid": amount
+    }
 
 
 def record_detection(plate_text, state, confidence):
@@ -277,4 +318,29 @@ def get_analytics_data():
         "actual_today": actual_today,
         "current_hour": current_hour
     }
+
+
+def get_billing_stats():
+    """Calculate revenue ledger and retrieve recent payment transactions."""
+    total_rev_row = db.fetchone("SELECT SUM(amount_paid) as sum FROM detected_plates")
+    total_revenue = float(total_rev_row["sum"]) if total_rev_row and total_rev_row["sum"] is not None else 0.0
+
+    total_trans_row = db.fetchone("SELECT COUNT(*) as count FROM detected_plates WHERE amount_paid > 0")
+    total_transactions = total_trans_row["count"] if total_trans_row else 0
+
+    avg_transaction = round(total_revenue / total_transactions, 2) if total_transactions > 0 else 0.0
+
+    recent_rows = db.fetchall(
+        "SELECT plate_text, exit_time, duration_minutes, amount_paid FROM detected_plates "
+        "WHERE exit_time IS NOT NULL AND amount_paid > 0 ORDER BY exit_time DESC LIMIT 10"
+    )
+    recent_transactions = [dict(r) for r in recent_rows]
+
+    return {
+        "total_revenue": total_revenue,
+        "total_transactions": total_transactions,
+        "avg_transaction": avg_transaction,
+        "recent_transactions": recent_transactions
+    }
+
 

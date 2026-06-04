@@ -4,6 +4,7 @@ Smart Parking System — REST API Routes
 from flask import Blueprint, jsonify, request
 from services import parking_service
 from services.camera_service import get_latest_plate
+from models import database as db
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -44,7 +45,18 @@ def plate_detail(plate_id):
 
 @api_bp.route("/latest_plate")
 def latest_plate():
-    return jsonify(get_latest_plate())
+    plate = get_latest_plate()
+    if plate and plate.get("text"):
+        profile = db.fetchone("SELECT profile_type, owner_name, notes FROM vehicle_profiles WHERE plate_text = ?", (plate["text"],))
+        if profile:
+            plate["profile_type"] = profile["profile_type"]
+            plate["owner_name"] = profile["owner_name"]
+            plate["notes"] = profile["notes"]
+        else:
+            plate["profile_type"] = "normal"
+            plate["owner_name"] = "Visitor"
+            plate["notes"] = ""
+    return jsonify(plate)
 
 
 @api_bp.route("/activity")
@@ -75,6 +87,12 @@ def sandbox_entry():
     if not plate_text:
         return jsonify({"success": False, "error": "License plate text is required"}), 400
 
+    # Query profile details
+    profile = db.fetchone("SELECT profile_type, owner_name, notes FROM vehicle_profiles WHERE plate_text = ?", (plate_text,))
+    profile_type = profile["profile_type"] if profile else "normal"
+    owner_name = profile["owner_name"] if profile else "Visitor"
+    notes = profile["notes"] if profile else ""
+
     # Record detection
     parking_service.record_detection(plate_text, state, 0.95)
     
@@ -85,7 +103,10 @@ def sandbox_entry():
             "success": True,
             "space_id": space_id,
             "plate_text": plate_text,
-            "state": state
+            "state": state,
+            "profile_type": profile_type,
+            "owner_name": owner_name,
+            "notes": notes
         })
     else:
         return jsonify({"success": False, "error": "No parking spaces available"}), 400
@@ -103,4 +124,10 @@ def sandbox_exit():
     if result:
         return jsonify({"success": True, **result})
     return jsonify({"success": False, "error": "Space not occupied or not found"}), 400
+
+
+@api_bp.route("/billing/stats")
+def billing_stats():
+    return jsonify(parking_service.get_billing_stats())
+
 

@@ -42,3 +42,5 @@ static/images/plate_*.png
 assets/*.xml
 CarParkPos
 *.mp4
+
+walkthrough.md
