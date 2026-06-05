@@ -344,3 +344,35 @@ def get_billing_stats():
     }
 
 
+def get_all_profiles():
+    """Retrieve all vehicle profiles from the database."""
+    rows = db.fetchall(
+        "SELECT plate_text, profile_type, owner_name, notes FROM vehicle_profiles ORDER BY plate_text ASC"
+    )
+    return [dict(r) for r in rows]
+
+
+def save_profile(plate_text, profile_type, owner_name, notes):
+    """Insert or update a vehicle profile record."""
+    db.execute(
+        "INSERT OR REPLACE INTO vehicle_profiles (plate_text, profile_type, owner_name, notes) "
+        "VALUES (?, ?, ?, ?)",
+        (plate_text, profile_type, owner_name, notes),
+        commit=True
+    )
+    db.log_activity("profile_updated", f"Saved vehicle profile for {plate_text} ({profile_type})", plate_text)
+    return True
+
+
+def delete_profile(plate_text):
+    """Delete a vehicle profile record from the database."""
+    db.execute(
+        "DELETE FROM vehicle_profiles WHERE plate_text = ?",
+        (plate_text,),
+        commit=True
+    )
+    db.log_activity("profile_deleted", f"Deleted vehicle profile for {plate_text}", plate_text)
+    return True
+
+
+

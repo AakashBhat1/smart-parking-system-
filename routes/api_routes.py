@@ -131,3 +131,34 @@ def billing_stats():
     return jsonify(parking_service.get_billing_stats())
 
 
+@api_bp.route("/profiles")
+def get_profiles():
+    return jsonify({"profiles": parking_service.get_all_profiles()})
+
+
+@api_bp.route("/profiles", methods=["POST"])
+def save_profile():
+    data = request.get_json() or {}
+    plate_text = data.get("plate_text", "").strip().upper()
+    profile_type = data.get("profile_type", "normal").strip().lower()
+    owner_name = data.get("owner_name", "").strip()
+    notes = data.get("notes", "").strip()
+
+    if not plate_text:
+        return jsonify({"success": False, "error": "Plate text is required"}), 400
+
+    if profile_type not in ("normal", "vip", "blacklist"):
+        profile_type = "normal"
+
+    success = parking_service.save_profile(plate_text, profile_type, owner_name, notes)
+    return jsonify({"success": success})
+
+
+@api_bp.route("/profiles/<plate_text>", methods=["DELETE"])
+def delete_profile(plate_text):
+    plate_text = plate_text.strip().upper()
+    success = parking_service.delete_profile(plate_text)
+    return jsonify({"success": success})
+
+
+

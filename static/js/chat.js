@@ -110,6 +110,18 @@ document.addEventListener('DOMContentLoaded', () => {
                                 p.textContent = fullResponse;
                                 messages.scrollTop = messages.scrollHeight;
                             }
+                            if (data.action) {
+                                const action = data.action;
+                                if (action.event === 'entry') {
+                                    window.dispatchEvent(new CustomEvent('sandbox:entry', { detail: action }));
+                                } else if (action.event === 'exit') {
+                                    window.dispatchEvent(new CustomEvent('sandbox:exit', { detail: action }));
+                                } else if (action.event === 'profile_change') {
+                                    if (window.refreshProfilesTable) {
+                                        window.refreshProfilesTable();
+                                    }
+                                }
+                            }
                             if (data.done) break;
                         } catch (e) {}
                     }

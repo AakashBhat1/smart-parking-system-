@@ -90,11 +90,113 @@ def _get_system_prompt(mode):
         return USER_SYSTEM_PROMPT.format(context=context, rate=config.PARKING_RATE_PER_HOUR)
 
 
+import re
+import random
+from models import database as db
+
+def parse_ai_command(message):
+    message_upper = message.strip().upper()
+    
+    # 1. Park commands
+    if re.search(r"\bPARK\s+(?:A\s+)?VIP", message_upper):
+        plate = f"VIP-{random.randint(100, 999)}"
+        parking_service.save_profile(plate, "vip", "VIP Guest", "Self-parked via AI Chat")
+        parking_service.record_detection(plate, "DL", 0.98)
+        space_id = parking_service.assign_space(plate)
+        if space_id:
+            return f"🤖 **AI Command Executed**: Registered and assigned VIP vehicle **{plate}** to premium ground spot **{space_id}**.", {"event": "entry", "space_id": space_id, "plate_text": plate, "profile_type": "vip"}
+        else:
+            return "🤖 **AI Command Failed**: Sorry, no parking spaces are currently available.", None
+
+    if re.search(r"\bPARK\s+(?:A\s+)?(?:NORMAL\s+)?CAR", message_upper) or re.search(r"\bPARK\s+(?:A\s+)?VEHICLE", message_upper):
+        states = ['MH', 'DL', 'KA', 'GJ', 'HR', 'UP']
+        letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        plate = f"{random.choice(states)}{random.randint(1, 99):02d}{random.choice(letters)}{random.choice(letters)}{random.randint(1000, 9999):04d}"
+        parking_service.record_detection(plate, "MH", 0.95)
+        space_id = parking_service.assign_space(plate)
+        if space_id:
+            return f"🤖 **AI Command Executed**: Parked normal vehicle **{plate}** in space **{space_id}**.", {"event": "entry", "space_id": space_id, "plate_text": plate, "profile_type": "normal"}
+        else:
+            return "🤖 **AI Command Failed**: Sorry, no parking spaces are currently available.", None
+
+    match_park = re.search(r"\b(?:PARK|ASSIGN|ENTRY)\s+([A-Z0-9-]{4,10})", message_upper)
+    if match_park:
+        plate = match_park.group(1)
+        profile = db.fetchone("SELECT profile_type FROM vehicle_profiles WHERE plate_text = ?", (plate,))
+        profile_type = profile["profile_type"] if profile else "normal"
+        parking_service.record_detection(plate, "DL", 0.95)
+        space_id = parking_service.assign_space(plate)
+        if space_id:
+            return f"🤖 **AI Command Executed**: Parked vehicle **{plate}** ({profile_type.upper()}) in space **{space_id}**.", {"event": "entry", "space_id": space_id, "plate_text": plate, "profile_type": profile_type}
+        else:
+            return f"🤖 **AI Command Failed**: No parking spaces available for vehicle **{plate}**.", None
+
+    # 2. Unpark / Release commands
+    match_release_space = re.search(r"\b(?:RELEASE|UNPARK|EXIT|FREE)\s+(?:SPACE\s+)?([G|F1|F2]-\d{2})", message_upper)
+    if match_release_space:
+        space_id = match_release_space.group(1)
+        row = db.fetchone("SELECT plate_text FROM parking_spaces WHERE space_id = ? AND is_occupied = 1", (space_id,))
+        if not row:
+            return f"🤖 **AI Command Alert**: Space **{space_id}** is already free.", None
+        
+        plate = row["plate_text"]
+        result = parking_service.release_space(space_id)
+        if result:
+            return f"🤖 **AI Command Executed**: Released vehicle **{plate}** from space **{space_id}**.", {"event": "exit", **result}
+        else:
+            return f"🤖 **AI Command Failed**: Could not release space **{space_id}**.", None
+
+    match_release_plate = re.search(r"\b(?:RELEASE|UNPARK|EXIT|FREE)\s+([A-Z0-9-]{4,10})", message_upper)
+    if match_release_plate:
+        plate = match_release_plate.group(1)
+        row = db.fetchone("SELECT space_id FROM parking_spaces WHERE plate_text = ? AND is_occupied = 1", (plate,))
+        if not row:
+            return f"🤖 **AI Command Alert**: Vehicle **{plate}** is not currently parked.", None
+        
+        space_id = row["space_id"]
+        result = parking_service.release_space(space_id)
+        if result:
+            return f"🤖 **AI Command Executed**: Released vehicle **{plate}** from space **{space_id}**.", {"event": "exit", **result}
+        else:
+            return f"🤖 **AI Command Failed**: Could not release vehicle **{plate}**.", None
+
+    # 3. Security profile management commands
+    match_blacklist = re.search(r"\bBLACKLIST\s+([A-Z0-9-]{4,10})", message_upper)
+    if match_blacklist:
+        plate = match_blacklist.group(1)
+        parking_service.save_profile(plate, "blacklist", "Suspect", "Flagged via AI chat command")
+        return f"🤖 **AI Command Executed**: Added plate **{plate}** to the SECURITY BLACKLIST BOLO database.", {"event": "profile_change", "plate_text": plate, "profile_type": "blacklist"}
+
+    match_vip_cmd = re.search(r"\bVIP\s+([A-Z0-9-]{4,10})", message_upper)
+    if match_vip_cmd:
+        plate = match_vip_cmd.group(1)
+        parking_service.save_profile(plate, "vip", "VIP Member", "Added via AI chat command")
+        return f"🤖 **AI Command Executed**: Registered plate **{plate}** as a VIP Guest profile.", {"event": "profile_change", "plate_text": plate, "profile_type": "vip"}
+
+    match_delete = re.search(r"\b(?:REMOVE|DELETE|CLEAR)\s+(?:VIP|BLACKLIST|PROFILE\s+)?([A-Z0-9-]{4,10})", message_upper)
+    if match_delete:
+        plate = match_delete.group(1)
+        profile = db.fetchone("SELECT profile_type FROM vehicle_profiles WHERE plate_text = ?", (plate,))
+        if not profile:
+            return f"🤖 **AI Command Alert**: No registered profile found for plate **{plate}**.", None
+        
+        parking_service.delete_profile(plate)
+        return f"🤖 **AI Command Executed**: Removed profile registration for plate **{plate}**.", {"event": "profile_change", "plate_text": plate, "profile_type": "normal"}
+
+    return None, None
+
+
 def chat_stream(user_message, mode="user", history=None):
     """
     Send a message to Ollama and yield response chunks (streaming).
     history: list of {"role": "user"|"assistant", "content": "..."} dicts
     """
+    # Check for direct AI Command-Control patterns
+    command_response, action_data = parse_ai_command(user_message)
+    if command_response:
+        yield {"content": command_response, "action": action_data}
+        return
+
     system_prompt = _get_system_prompt(mode)
 
     messages = [{"role": "system", "content": system_prompt}]

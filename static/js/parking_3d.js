@@ -16,6 +16,8 @@
     let transitionStartTime = 0;
     const transitionDuration = 1000; // ms transition time
     let currentFocusedFloor = 'all';
+    let activeNavPaths = {};
+    let thermalMode = false;
 
     const slotWidth = 4.8;
     const slotDepth = 2.6;
@@ -168,6 +170,16 @@
 
         // Initialize Floor Selector Click Events
         setupFloorSelector();
+
+        // Initialize Thermal Toggle Click Event
+        const thermalToggle = document.getElementById('thermal-toggle');
+        if (thermalToggle) {
+            const newToggle = thermalToggle.cloneNode(true);
+            thermalToggle.parentNode.replaceChild(newToggle, thermalToggle);
+            newToggle.addEventListener('click', () => {
+                toggleThermalMode(!thermalMode);
+            });
+        }
 
         // Start Animation Loop
         animate();
@@ -403,6 +415,60 @@
     const entranceGate = { x: -55, y: 0, z: 0 };
     const exitGate = { x: 55, y: 0, z: 0 };
 
+    function createNavPath(points) {
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineDashedMaterial({
+            color: 0x00d2ff, // cyan neon
+            dashSize: 1.5,
+            gapSize: 0.8,
+            transparent: true,
+            opacity: 0.8,
+            depthWrite: false
+        });
+
+        material.userData = { dashOffset: 0 };
+        material.onBeforeCompile = function(shader) {
+            shader.uniforms.dashOffset = {
+                get value() { return material.userData.dashOffset; }
+            };
+            shader.vertexShader = shader.vertexShader.replace(
+                'void main() {',
+                'uniform float dashOffset;\nvoid main() {'
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                'vLineDistance = lineDistance;',
+                'vLineDistance = lineDistance + dashOffset;'
+            );
+        };
+
+        const line = new THREE.Line(geometry, material);
+        line.computeLineDistances();
+        return line;
+    }
+
+    function fadeAndRemovePath(spaceId) {
+        const path = activeNavPaths[spaceId];
+        if (!path) return;
+        delete activeNavPaths[spaceId];
+        
+        path.userData.isFading = true;
+        const duration = 500; // ms
+        const startTime = performance.now();
+        
+        function fade(now) {
+            const progress = (now - startTime) / duration;
+            if (progress >= 1) {
+                scene.remove(path);
+                path.geometry.dispose();
+                path.material.dispose();
+                return;
+            }
+            path.material.opacity = (1 - progress) * 0.8;
+            requestAnimationFrame(fade);
+        }
+        requestAnimationFrame(fade);
+    }
+
     function animateCarParking(spaceId, plateText, zone) {
         // Destroy existing car object if any
         if (carObjects[spaceId]) {
@@ -425,12 +491,42 @@
         const startTime = performance.now();
         const targetY = coords.y;
 
+        // Draw nav path
+        const points = [];
+        if (targetY > 0) {
+            points.push(new THREE.Vector3(-55, 0.05, 0));
+            points.push(new THREE.Vector3(-35, 0.05, 0));
+            points.push(new THREE.Vector3(-20, targetY + 0.05, 0));
+            points.push(new THREE.Vector3(coords.x, targetY + 0.05, 0));
+            points.push(new THREE.Vector3(coords.x, targetY + 0.05, coords.z));
+        } else {
+            points.push(new THREE.Vector3(-55, 0.05, 0));
+            points.push(new THREE.Vector3(coords.x, 0.05, 0));
+            points.push(new THREE.Vector3(coords.x, 0.05, coords.z));
+        }
+
+        if (activeNavPaths[spaceId]) {
+            scene.remove(activeNavPaths[spaceId]);
+            activeNavPaths[spaceId].geometry.dispose();
+            activeNavPaths[spaceId].material.dispose();
+        }
+
+        const pathLine = createNavPath(points);
+        // Make sure its initial opacity respect currentFocusedFloor
+        const { floor: slotFloor } = parseSpaceId(spaceId);
+        const isFocused = (currentFocusedFloor === 'all' || slotFloor === currentFocusedFloor);
+        pathLine.material.opacity = isFocused ? 0.8 : 0.12;
+
+        scene.add(pathLine);
+        activeNavPaths[spaceId] = pathLine;
+
         function driveIn(now) {
             const progress = (now - startTime) / duration;
             if (progress >= 1) {
                 car.position.set(coords.x, coords.y, coords.z);
                 car.rotation.set(0, zone === 'C' ? 0 : Math.PI, 0);
                 updateFloorVisibilities();
+                fadeAndRemovePath(spaceId);
                 return;
             }
 
@@ -574,12 +670,81 @@
         const slot = slotObjects[spaceId];
         if (!slot) return;
         
+        if (thermalMode) return;
+
         slot.traverse(child => {
             if (child instanceof THREE.Line) {
                 child.material.color.setHex(hexColor);
             }
         });
     }
+
+    window.toggleThermalMode = function(active) {
+        thermalMode = active;
+        const thermalBtn = document.getElementById('thermal-toggle');
+        if (thermalBtn) {
+            if (thermalMode) {
+                thermalBtn.style.background = 'rgba(255, 82, 82, 0.2)';
+                thermalBtn.style.color = '#ff5252';
+                thermalBtn.style.border = '1px solid #ff5252';
+                thermalBtn.style.boxShadow = '0 0 10px rgba(255, 82, 82, 0.4)';
+            } else {
+                thermalBtn.style.background = 'none';
+                thermalBtn.style.color = 'var(--text-2)';
+                thermalBtn.style.border = '1px solid transparent';
+                thermalBtn.style.boxShadow = 'none';
+            }
+        }
+
+        if (thermalMode) {
+            fetch('/api/analytics')
+                .then(r => r.json())
+                .then(data => {
+                    const heatmap = data.heatmap || {};
+                    const counts = Object.values(heatmap);
+                    const maxUsage = counts.length > 0 ? Math.max(...counts) : 0;
+                    const denom = maxUsage || 1;
+
+                    Object.entries(slotObjects).forEach(([spaceId, group]) => {
+                        const count = heatmap[spaceId] || 0;
+                        const ratio = count / denom;
+                        
+                        // Color gradient: Cold cyan (0x00b0ff) -> Hot ruby (0xff5252)
+                        const colorCold = new THREE.Color(0x00b0ff);
+                        const colorHot = new THREE.Color(0xff5252);
+                        const slotColor = colorCold.clone().lerp(colorHot, ratio);
+
+                        group.traverse(child => {
+                            if (child instanceof THREE.Line) {
+                                child.material.color.copy(slotColor);
+                            } else if (child instanceof THREE.Mesh) {
+                                child.material.color.copy(slotColor);
+                                child.material.opacity = 0.1 + ratio * 0.4;
+                            }
+                        });
+                    });
+                })
+                .catch(err => {
+                    console.error("Failed to load thermal heatmap:", err);
+                });
+        } else {
+            // Restore original colors
+            Object.entries(slotObjects).forEach(([spaceId, group]) => {
+                const s = slotData[spaceId];
+                const isOccupied = s ? s.is_occupied : false;
+                const baseColor = new THREE.Color(isOccupied ? 0xff5252 : 0x00c853);
+                
+                group.traverse(child => {
+                    if (child instanceof THREE.Line) {
+                        child.material.color.copy(baseColor);
+                    } else if (child instanceof THREE.Mesh) {
+                        child.material.color.copy(baseColor);
+                        child.material.opacity = 0.02;
+                    }
+                });
+            });
+        }
+    };
 
     function handleSandboxEvent(detail, type) {
         if (!isInitialized) return;
@@ -742,6 +907,16 @@
             setGroupOpacity(group, isFocused ? 1.0 : 0.15);
         });
 
+        Object.entries(activeNavPaths).forEach(([spaceId, path]) => {
+            const { floor: slotFloor } = parseSpaceId(spaceId);
+            const isFocused = (floor === 'all' || slotFloor === floor);
+            if (path && path.material) {
+                path.material.transparent = true;
+                if (path.userData && path.userData.isFading) return;
+                path.material.opacity = isFocused ? 0.8 : 0.12;
+            }
+        });
+
         if (floor1SlabMesh && floor1GridHelper) {
             const isFocused = (floor === 'all' || floor === '1');
             floor1SlabMesh.material.opacity = isFocused ? 0.9 : 0.15;
@@ -799,6 +974,13 @@
             cameraTargetPos = null;
             controlsTargetPos = null;
         }
+
+        // Animate navigation path dash offset
+        Object.values(activeNavPaths).forEach(path => {
+            if (path && path.material && path.material.userData) {
+                path.material.userData.dashOffset -= 0.15;
+            }
+        });
 
         if (controls) controls.update();
         if (renderer && scene && camera) renderer.render(scene, camera);

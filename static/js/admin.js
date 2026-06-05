@@ -317,6 +317,128 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(() => {});
     }
 
+    function updateProfilesTable() {
+        fetch('/api/profiles')
+            .then(r => r.json())
+            .then(data => {
+                const tbody = document.getElementById('profiles-tbody');
+                const countEl = document.getElementById('profiles-count');
+                
+                if (!tbody) return;
+                
+                const profiles = data.profiles || [];
+                if (countEl) countEl.textContent = `${profiles.length} registered`;
+
+                if (!profiles.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="center">No vehicle profiles registered</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = profiles.map(p => {
+                    let typeBadge = '';
+                    if (p.profile_type === 'vip') {
+                        typeBadge = '<span class="event-badge vip-entry">VIP</span>';
+                    } else if (p.profile_type === 'blacklist') {
+                        typeBadge = '<span class="event-badge security_alert">Blacklist</span>';
+                    } else {
+                        typeBadge = '<span class="event-badge space_assigned">Normal</span>';
+                    }
+                    
+                    return `
+                        <tr>
+                            <td style="font-weight: 700; color: var(--accent);">${p.plate_text}</td>
+                            <td>${typeBadge}</td>
+                            <td>${p.owner_name || '--'}</td>
+                            <td style="font-size: 0.75rem; color: var(--text-3);">${p.notes || '--'}</td>
+                            <td>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="floor-btn" onclick="editProfile('${p.plate_text}', '${p.profile_type}', '${escapeQuote(p.owner_name)}', '${escapeQuote(p.notes)}')" style="padding: 4px 8px; font-size: 0.7rem; width: auto; border: 1px solid var(--border);"><i class="fas fa-edit"></i></button>
+                                    <button class="floor-btn" onclick="deleteProfile('${p.plate_text}')" style="padding: 4px 8px; font-size: 0.7rem; width: auto; border: 1px solid var(--border); color: #ff5252;"><i class="fas fa-trash"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            })
+            .catch(() => {});
+    }
+
+    function escapeQuote(str) {
+        if (!str) return '';
+        return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    // Expose CRUD actions globally so HTML inline click works
+    window.refreshProfilesTable = updateProfilesTable;
+
+    window.editProfile = function(plate, type, owner, notes) {
+        const plateInput = document.getElementById('prof-plate');
+        const typeSelect = document.getElementById('prof-type');
+        const ownerInput = document.getElementById('prof-owner');
+        const notesInput = document.getElementById('prof-notes');
+        
+        if (plateInput) plateInput.value = plate;
+        if (typeSelect) typeSelect.value = type;
+        if (ownerInput) ownerInput.value = owner;
+        if (notesInput) notesInput.value = notes;
+        
+        if (plateInput) plateInput.focus();
+    };
+
+    window.deleteProfile = function(plate) {
+        if (!confirm(`Are you sure you want to delete profile for ${plate}?`)) return;
+        
+        fetch(`/api/profiles/${plate}`, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    updateProfilesTable();
+                } else {
+                    alert('Failed to delete profile');
+                }
+            })
+            .catch(() => alert('Network error deleting profile'));
+    };
+
+    // Setup form submit
+    const crudForm = document.getElementById('profile-crud-form');
+    if (crudForm) {
+        crudForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const plate = document.getElementById('prof-plate').value.trim().toUpperCase();
+            const type = document.getElementById('prof-type').value;
+            const owner = document.getElementById('prof-owner').value.trim();
+            const notes = document.getElementById('prof-notes').value.trim();
+            
+            const saveBtn = document.getElementById('prof-save-btn');
+            if (saveBtn) saveBtn.disabled = true;
+
+            fetch('/api/profiles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    plate_text: plate,
+                    profile_type: type,
+                    owner_name: owner,
+                    notes: notes
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    crudForm.reset();
+                    updateProfilesTable();
+                } else {
+                    alert('Failed to save profile');
+                }
+            })
+            .catch(() => alert('Network error saving profile'))
+            .finally(() => {
+                if (saveBtn) saveBtn.disabled = false;
+            });
+        });
+    }
+
     // Initial load
     updateSession();
     updateStats();
@@ -324,6 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateActivity();
     updateAnalytics();
     updateBillingStats();
+    updateProfilesTable();
 
     // Refresh intervals
     setInterval(updateUptime, 1000);
@@ -333,4 +456,5 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(updateActivity, 4000);
     setInterval(updateAnalytics, 10000);
     setInterval(updateBillingStats, 5000);
+    setInterval(updateProfilesTable, 5000);
 });

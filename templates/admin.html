@@ -170,6 +170,67 @@
     </div>
 </div>
 
+<div class="card" style="margin-top: 24px;">
+    <div class="card-header" style="display: flex; align-items: center; justify-content: space-between;">
+        <h2><i class="fas fa-id-card-clip" style="color: var(--accent);"></i> Security & Vehicle Profiles</h2>
+        <span class="card-badge" id="profiles-count">0 registered</span>
+    </div>
+    <div class="card-body">
+        <div class="grid-2" style="gap: 20px; align-items: flex-start; margin-bottom: 0;">
+            <!-- Profiles List Table -->
+            <div class="activity-table-wrap" style="flex: 1.4; max-height: 350px; overflow-y: auto; width: 100%;">
+                <table class="activity-table" style="margin: 0; width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Plate</th>
+                            <th>Type</th>
+                            <th>Owner</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="profiles-tbody">
+                        <tr><td colspan="5" class="center">Loading profiles...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Profile Add/Edit Form -->
+            <div style="flex: 0.6; background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 16px; border-radius: 8px; width: 100%;">
+                <h3 style="margin: 0 0 14px 0; font-size: 0.9rem; font-weight: 700; color: #fff; border-bottom: 1px solid var(--border); padding-bottom: 8px;"><i class="fas fa-user-plus"></i> Register Profile</h3>
+                
+                <form id="profile-crud-form" style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label for="prof-plate" style="font-size: 0.72rem; color: var(--text-3); font-weight: 600;">License Plate</label>
+                        <input type="text" id="prof-plate" placeholder="e.g. MH12AB1234" required style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: #fff; font-family: inherit; font-size: 0.8rem; text-transform: uppercase;">
+                    </div>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label for="prof-type" style="font-size: 0.72rem; color: var(--text-3); font-weight: 600;">Profile Type</label>
+                        <select id="prof-type" style="background: rgba(18,18,18,0.95); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: #fff; font-family: inherit; font-size: 0.8rem; cursor: pointer;">
+                            <option value="normal">Normal (Visitor / Employee)</option>
+                            <option value="vip">VIP (Guest / Executive)</option>
+                            <option value="blacklist">Blacklist (Security Flag / BOLO)</option>
+                        </select>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label for="prof-owner" style="font-size: 0.72rem; color: var(--text-3); font-weight: 600;">Owner Name</label>
+                        <input type="text" id="prof-owner" placeholder="e.g. John Doe" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: #fff; font-family: inherit; font-size: 0.8rem;">
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label for="prof-notes" style="font-size: 0.72rem; color: var(--text-3); font-weight: 600;">Notes</label>
+                        <textarea id="prof-notes" placeholder="Notes or instructions..." rows="2" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: #fff; font-family: inherit; font-size: 0.8rem; resize: vertical;"></textarea>
+                    </div>
+
+                    <button type="submit" id="prof-save-btn" style="background: var(--accent); border: none; border-radius: 6px; padding: 10px; color: #000; font-family: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: opacity 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px;">Save Profile</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header">
         <h2><i class="fas fa-list-timeline"></i> Activity Log</h2>

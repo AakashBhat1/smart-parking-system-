@@ -28,7 +28,10 @@ def chat():
     def generate():
         for chunk in ai_assistant.chat_stream(message, mode, history):
             # SSE format
-            yield f"data: {json.dumps({'content': chunk})}\n\n"
+            if isinstance(chunk, dict):
+                yield f"data: {json.dumps(chunk)}\n\n"
+            else:
+                yield f"data: {json.dumps({'content': chunk})}\n\n"
         yield f"data: {json.dumps({'done': True})}\n\n"
 
     return Response(
